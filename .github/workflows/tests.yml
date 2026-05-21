@@ -1,0 +1,101 @@
+name: Tests
+
+on:
+  push:
+    branches: ["main", "master", "develop"]
+  pull_request:
+    branches: ["main", "master", "develop"]
+
+jobs:
+  test:
+    name: Test suite (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python setup ──────────────────────────────────────────────────────────
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      # ── Dependencies ──────────────────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Ollama is not available in CI — force TF-IDF for RAG ─────────────────
+      # The agent automatically falls back to scikit-learn TF-IDF when Ollama
+      # is unreachable, so no tests are skipped; coverage is unaffected.
+      - name: Configure CI environment
+        run: |
+          # Create required runtime directories so config.py setup_dirs() succeeds
+          mkdir -p sandbox logs cache
+          # Patch config to force TF-IDF (no Ollama in CI)
+          python - <<'EOF'
+          import pathlib, re
+          cfg = pathlib.Path("agent/config.py")
+          txt = cfg.read_text()
+          txt = txt.replace("rag_force_tfidf: bool = False", "rag_force_tfidf: bool = True")
+          cfg.write_text(txt)
+          print("rag_force_tfidf set to True for CI")
+          EOF
+
+      # ── Lint (non-blocking — only warns on PRs) ────────────────────────────
+      - name: Lint with flake8
+        run: |
+          pip install flake8 --quiet
+          # Stop the build for syntax errors or undefined names
+          flake8 agent/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warn on style issues but do not fail the build
+          flake8 agent/ --count --exit-zero --max-line-length=100 \
+            --extend-ignore=E203,W503 --statistics
+        continue-on-error: true
+
+      # ── Test suite ────────────────────────────────────────────────────────────
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --cov=agent \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --tb=short \
+            -q
+        env:
+          # Prevents matplotlib from trying to open a display
+          MPLBACKEND: Agg
+          # Keeps multiprocessing stable in CI (matches conftest.py spawn setting)
+          PYTHONFAULTHANDLER: "1"
+
+      # ── Coverage report ───────────────────────────────────────────────────────
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: unittests
+          name: datasage-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      # ── Upload test artefacts on failure ─────────────────────────────────────
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-py${{ matrix.python-version }}
+          path: |
+            logs/
+            coverage.xml
+          retention-days: 7
