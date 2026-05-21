@@ -1,6 +1,6 @@
 # DataPilot — Local AI Data Analyst Agent
 
-[![Tests](https://github.com/AdithyaRaoK14/DataPilot-Local-AI-Data-Analyst-Agent/actions/workflows/tests.yml/badge.svg)](https://github.com/YOUR_USERNAME/DataPilot/actions/workflows/tests.yml)
+[![Tests](https://github.com/AdithyaRaoK14/DataPilot-Local-AI-Data-Analyst-Agent/actions/workflows/tests.yml/badge.svg)](https://github.com/AdithyaRaoK14/DataPilot-Local-AI-Data-Analyst-Agent/actions/workflows/tests.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen.svg)](#)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2%2B-orange.svg)](https://github.com/langchain-ai/langgraph)
